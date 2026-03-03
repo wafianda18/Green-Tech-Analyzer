@@ -1,0 +1,116 @@
+.zone {
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--paper-card);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.zone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(45, 106, 79, 0.04), transparent 70%);
+  pointer-events: none;
+}
+
+.zone:hover, .dragging {
+  border-color: var(--accent-light);
+  background: var(--accent-pale);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.loading {
+  pointer-events: none;
+  cursor: default;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.iconWrap {
+  margin-bottom: 8px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.mainText {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.subText {
+  font-size: 0.9rem;
+  color: var(--ink-muted);
+}
+
+.link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  font-style: italic;
+  margin-top: 4px;
+  padding: 4px 12px;
+  background: var(--paper-warm);
+  border-radius: 100px;
+  border: 1px solid var(--border);
+}
+
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--accent-pale);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loadingText {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.loadingSubtext {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
