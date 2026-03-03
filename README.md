@@ -9,7 +9,6 @@ Aplikasi analisis laporan keberlanjutan otomatis berbasis **Green Manufacturing 
 - Export hasil ke CSV dan laporan teks
 - Tampilan per stage (Stage 1–4) sesuai framework
 
-## Cara Deploy ke Vercel
 
 ### 1. Install Node.js & npm
 Pastikan Node.js >= 18 terinstall.
@@ -24,25 +23,6 @@ npm install
 npm run dev
 ```
 
-### 4. Deploy ke Vercel
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
-
-# Atau deploy production
-vercel --prod
-```
-
-### 5. Alternatif: Deploy via GitHub
-1. Push ke GitHub repository
-2. Buka vercel.com → New Project → Import repository
-3. Framework: Vite (auto-detected)
-4. Build Command: `npm run build`
-5. Output Directory: `dist`
-6. Deploy!
 
 ## Catatan Teknis
 - PDF harus berupa teks (bukan scan gambar)
