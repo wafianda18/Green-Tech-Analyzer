@@ -1,6 +1,6 @@
 # Green Tech Analyzer
 
-Aplikasi analisis laporan keberlanjutan otomatis berbasis **Shukla & Adil (2022) Green Manufacturing Maturity Framework**.
+Aplikasi analisis laporan keberlanjutan otomatis berbasis **Green Manufacturing Maturity Framework**.
 
 ## Fitur
 - Upload PDF laporan keberlanjutan (Sustainability Report / Data Book)
