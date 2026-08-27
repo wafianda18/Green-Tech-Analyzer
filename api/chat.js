@@ -1,18 +1,26 @@
-const DEFAULT_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "Qwen/Qwen3.5-35B-A3B";
+import {
+  fetchWithTimeout,
+  methodNotAllowed,
+  parseUpstreamPayload,
+  readJSONBody,
+  sendJSON,
+  upstreamErrorMessage,
+} from "./_shared.js";
 
-async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Method Not Allowed" });
-  }
+const DEFAULT_BASE = "https://openrouter.ai/api/v1";
+// OpenRouter model slugs are lowercase; the Hugging Face style casing
+// ("Qwen/Qwen3.5-35B-A3B") is rejected as an unknown model here.
+const DEFAULT_MODEL = "qwen/qwen3.5-35b-a3b";
+
+export default async function handler(req, res) {
+  if (methodNotAllowed(req, res)) return;
 
   try {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return res
-        .status(500)
-        .json({ error: "OPENAI_API_KEY belum diset di environment" });
+      return sendJSON(res, 500, {
+        error: "OPENAI_API_KEY belum diset di environment",
+      });
     }
 
     const baseUrl = (process.env.OPENAI_BASE_URL || DEFAULT_BASE).replace(
@@ -22,7 +30,13 @@ async function handler(req, res) {
     const endpoint = `${baseUrl}/chat/completions`;
     const model = process.env.LLM_MODEL || DEFAULT_MODEL;
 
-    const body = await parseJSON(req);
+    let body;
+    try {
+      body = await readJSONBody(req);
+    } catch {
+      return sendJSON(res, 400, { error: "Body request bukan JSON yang valid" });
+    }
+
     const {
       messages = [],
       max_tokens,
@@ -32,6 +46,10 @@ async function handler(req, res) {
       top_k,
       extra_body = {},
     } = body || {};
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return sendJSON(res, 400, { error: "Field 'messages' wajib diisi" });
+    }
 
     const payload = {
       model,
@@ -55,46 +73,23 @@ async function handler(req, res) {
       headers["X-Title"] = process.env.OPENROUTER_TITLE;
     }
 
-    const resp = await fetch(endpoint, {
+    const resp = await fetchWithTimeout(endpoint, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
     });
 
-    const text = await resp.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = { raw: text };
-    }
+    const data = parseUpstreamPayload(await resp.text());
 
     if (!resp.ok) {
-      return res.status(resp.status).json({
-        error: data?.error || data?.message || "Gagal memanggil penyedia LLM",
+      return sendJSON(res, resp.status, {
+        error: upstreamErrorMessage(data, "Gagal memanggil penyedia LLM"),
         status: resp.status,
       });
     }
 
-    return res.status(200).json(data);
+    return sendJSON(res, 200, data);
   } catch (err) {
-    return res.status(500).json({ error: err?.message || String(err) });
+    return sendJSON(res, 500, { error: err?.message || String(err) });
   }
 }
-
-async function parseJSON(req) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => (data += chunk));
-    req.on("end", () => {
-      try {
-        resolve(data ? JSON.parse(data) : {});
-      } catch (e) {
-        reject(e);
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
-module.exports = handler;

@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { CODEBOOK, ADDITIONAL_CODES, STAGE_COLORS } from "../data/codebook.js";
+import { CODEBOOK, STAGE_COLORS } from "../data/codebook.js";
 import { buildStageSummary } from "../utils/analyzer.js";
 import {
   exportToCSV,
   downloadCSV,
+  downloadText,
   exportFullReport,
+  buildExportFilename,
 } from "../utils/exporter.js";
 import styles from "./ResultsPanel.module.css";
 
@@ -23,22 +25,17 @@ export default function ResultsPanel({ analysisResult, metadata }) {
   const totalCoded = analysisResult.codedParagraphs.length;
 
   const handleExportCSV = () => {
-    const csv = exportToCSV(analysisResult, metadata);
     downloadCSV(
-      csv,
-      `${metadata.companyName || "analysis"}_${metadata.reportYear || ""}_coding.csv`,
+      exportToCSV(analysisResult, metadata),
+      buildExportFilename(metadata, "coding", "csv"),
     );
   };
 
   const handleExportReport = () => {
-    const report = exportFullReport(analysisResult, metadata);
-    const blob = new Blob([report], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${metadata.companyName || "analysis"}_${metadata.reportYear || ""}_report.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadText(
+      exportFullReport(analysisResult, metadata),
+      buildExportFilename(metadata, "report", "txt"),
+    );
   };
 
   return (
@@ -50,9 +47,13 @@ export default function ResultsPanel({ analysisResult, metadata }) {
             {metadata.companyName || "Perusahaan"}
           </h2>
           <div className={styles.headerMeta}>
-            <span className={styles.badge}>{metadata.reportYear}</span>
-            <span className={styles.badge}>{metadata.region}</span>
-            <span className={styles.badge}>{metadata.industry}</span>
+            {[metadata.reportYear, metadata.region, metadata.industry]
+              .filter(Boolean)
+              .map((value) => (
+                <span key={value} className={styles.badge}>
+                  {value}
+                </span>
+              ))}
           </div>
         </div>
         <div className={styles.exportButtons}>
@@ -65,13 +66,19 @@ export default function ResultsPanel({ analysisResult, metadata }) {
         </div>
       </div>
 
+      {analysisResult.aiSummaryError && (
+        <div className={styles.tabContent}>
+          <p className={styles.listMeta}>⚠ {analysisResult.aiSummaryError}</p>
+        </div>
+      )}
+
       {analysisResult.aiSummary && (
         <div
           className={styles.tabContent}
           style={{ borderBottom: "1px solid var(--border)" }}
         >
           <div className={styles.section}>
-            <h3 className={styles.sectionTitle}>Ringkasan AI (Qwen3.5)</h3>
+            <h3 className={styles.sectionTitle}>Ringkasan AI</h3>
             <div
               style={{
                 whiteSpace: "pre-wrap",
@@ -186,16 +193,15 @@ function SummaryTab({ analysisResult, stageSummary, metadata }) {
           {Object.entries(CODEBOOK).map(([stageKey, stageData]) => {
             const stageNum = parseInt(stageKey.replace("stage", ""));
             const stageColors = STAGE_COLORS[stageNum];
-            let stageTotal = 0;
-            let activeCodeCount = 0;
+            // Stage aggregates come from buildStageSummary so the header, the
+            // total row and the CSV all count the same way.
+            const { total: stageTotal, count: activeCodeCount } =
+              stageSummary[stageNum];
 
-            const codeRows = stageData.codes.map((codeEntry) => {
-              const summary = analysisResult.codeSummary[codeEntry.id];
-              const count = summary?.count || 0;
-              stageTotal += count;
-              if (count > 0) activeCodeCount++;
-              return { codeEntry, count };
-            });
+            const codeRows = stageData.codes.map((codeEntry) => ({
+              codeEntry,
+              count: analysisResult.codeSummary[codeEntry.id]?.count || 0,
+            }));
 
             return (
               <div key={stageKey} className={styles.stageBlock}>

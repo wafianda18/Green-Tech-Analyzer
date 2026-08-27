@@ -34,7 +34,7 @@ export const CODEBOOK = {
         code: '2 Source Reduction',
         stage: 2,
         definition: 'Mengurangi/menghilangkan konsumsi bahan baku dan energi pada sumbernya melalui optimasi proses',
-        keywords: ['source reduction', 'energy reduction', 'water reduction', 'resource efficiency', 'energy conservation', 'energy saving', 'less water', 'reduce consumption', 'energy intensity', 'water intensity', 'resource consumption', 'process optimization', 'efficient', 'reduced energy', 'reduced water', 'reduced raw material', 'fermentation technology', 'fewer resources', 'energy-efficient', 'conservation'],
+        keywords: ['source reduction', 'energy reduction', 'water reduction', 'resource efficiency', 'energy conservation', 'energy saving', 'less water', 'reduce consumption', 'energy intensity', 'water intensity', 'resource consumption', 'process optimization', 'energy efficient', 'reduced energy', 'reduced water', 'reduced raw material', 'fermentation technology', 'fewer resources', 'energy-efficient', 'water conservation'],
         actionVerbs: ['reduced', 'decreased', 'lowered', 'optimized', 'improved efficiency', 'saved', 'conserved', 'minimized', 'cut'],
         excludePatterns: ['target', 'goal to reduce', 'aim to', 'plan to reduce']
       },
@@ -43,7 +43,7 @@ export const CODEBOOK = {
         code: '2 Reduce of Hazardous Materials',
         stage: 2,
         definition: 'Mengurangi/menghilangkan penggunaan bahan kimia berbahaya dan/atau limbah berbahaya dalam proses produksi',
-        keywords: ['hazardous', 'toxic', 'CFC', 'voc', 'volatile organic', 'harmful chemical', 'dangerous substance', 'heavy metal', 'mercury', 'lead', 'cadmium', 'chromium', 'pesticide', 'reformulated', 'substitute material', 'non-toxic', 'voc-free', 'titanium dioxide', 'safer chemical', 'chemical substitution', 'elimination of hazardous'],
+        keywords: ['hazardous', 'toxic', 'CFC', 'voc', 'volatile organic', 'harmful chemical', 'dangerous substance', 'heavy metal', 'mercury', 'lead-free', 'lead content', 'cadmium', 'chromium', 'pesticide', 'reformulated', 'substitute material', 'non-toxic', 'voc-free', 'titanium dioxide', 'safer chemical', 'chemical substitution', 'elimination of hazardous'],
         actionVerbs: ['eliminated', 'replaced', 'substituted', 'reformulated', 'reduced use of', 'phased out', 'removed hazardous'],
         excludePatterns: ['plan to eliminate', 'will replace', 'aim to reduce']
       },
@@ -52,7 +52,7 @@ export const CODEBOOK = {
         code: '2 Recycling/Material Reuse',
         stage: 2,
         definition: 'Mengolah kembali material/limbah menjadi bahan/produk baru untuk mengurangi limbah dan penggunaan sumber daya baru',
-        keywords: ['recycling', 'recycle', 'reuse', 'reused', 'by-product', 'byproduct', 'waste utilization', 'material recovery', 'circular', 'closed loop', 'reverse logistics return', 'waste sorting', 'process water recycling', 'bio-cycle', 'composting', 'upcycling', 'repurpose', 'salvage', 'reclaimed', 'recovered material', 'waste-to-resource', 'fertilizer from waste'],
+        keywords: ['recycling', 'recycle', 'reuse', 'reused', 'by-product', 'byproduct', 'waste utilization', 'material recovery', 'circular economy', 'closed loop', 'reverse logistics return', 'waste sorting', 'process water recycling', 'bio-cycle', 'composting', 'upcycling', 'repurpose', 'salvage', 'reclaimed', 'recovered material', 'waste-to-resource', 'fertilizer from waste'],
         actionVerbs: ['recycled', 'reused', 'recovered', 'converted waste', 'utilized by-product', 'repurposed', 'composted'],
         excludePatterns: ['plan to recycle', 'goal to achieve zero waste']
       },
@@ -188,7 +188,7 @@ export const ADDITIONAL_CODES = [
     code: 'Renewable Energy',
     stage: null,
     definition: 'Penggunaan sumber energi terbarukan dalam operasional',
-    keywords: ['solar', 'solar panel', 'solar roof', 'wind energy', 'wind turbine', 'renewable energy', 're100', 'green electricity', 'biomass energy', 'hydropower', 'geothermal', 'ppa', 'renewable power purchase', 'mwh renewable', 'green tariff', 'renewable certificate', 'rec', 'go', 'I-REC'],
+    keywords: ['solar', 'solar panel', 'solar roof', 'wind energy', 'wind turbine', 'renewable energy', 're100', 'green electricity', 'biomass energy', 'hydropower', 'geothermal', 'ppa', 'renewable power purchase', 'mwh renewable', 'green tariff', 'renewable certificate', 'rec', 'i-rec', 'guarantee of origin'],
     actionVerbs: ['installed solar', 'generated renewable', 'procured renewable', 'switched to renewable'],
     excludePatterns: ['will install solar', 'plan to install', 'considering solar', 'exploring ppa']
   },
