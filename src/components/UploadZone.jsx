@@ -1,46 +1,81 @@
 import { useState, useRef } from 'react';
 import styles from './UploadZone.module.css';
 
-export default function UploadZone({ onFileSelected, isLoading }) {
+const PDF_MIME = 'application/pdf';
+
+function isPdf(file) {
+  // Some browsers report an empty type for drag-and-dropped files.
+  return file.type === PDF_MIME || /\.pdf$/i.test(file.name);
+}
+
+export default function UploadZone({ onFileSelected, onInvalidFile, isLoading, progress }) {
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef(null);
+
+  const accept = (file) => {
+    if (!file) return;
+    if (!isPdf(file)) {
+      onInvalidFile?.(`"${file.name}" bukan file PDF. Pilih file berformat .pdf.`);
+      return;
+    }
+    onFileSelected(file);
+  };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type === 'application/pdf') {
-      onFileSelected(file);
-    }
+    if (isLoading) return;
+    accept(e.dataTransfer.files[0]);
   };
 
   const handleChange = (e) => {
-    const file = e.target.files[0];
-    if (file) onFileSelected(file);
+    accept(e.target.files[0]);
+    // Reset so re-selecting the same file still fires a change event.
+    e.target.value = '';
+  };
+
+  const openPicker = () => {
+    if (!isLoading) inputRef.current?.click();
   };
 
   return (
     <div
       className={`${styles.zone} ${isDragging ? styles.dragging : ''} ${isLoading ? styles.loading : ''}`}
       onDrop={handleDrop}
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragOver={(e) => { e.preventDefault(); if (!isLoading) setIsDragging(true); }}
       onDragLeave={() => setIsDragging(false)}
-      onClick={() => !isLoading && inputRef.current?.click()}
+      onClick={openPicker}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openPicker();
+        }
+      }}
+      role="button"
+      tabIndex={isLoading ? -1 : 0}
+      aria-busy={isLoading}
+      aria-label="Upload file PDF laporan keberlanjutan"
     >
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf"
+        accept="application/pdf,.pdf"
         onChange={handleChange}
+        // The input lives inside the clickable zone, so its programmatic
+        // click would bubble back into openPicker.
+        onClick={(e) => e.stopPropagation()}
         className={styles.hiddenInput}
         disabled={isLoading}
+        tabIndex={-1}
       />
 
       <div className={styles.content}>
         {isLoading ? (
           <div className={styles.loadingState}>
             <div className={styles.spinner} />
-            <p className={styles.loadingText}>Mengekstrak & menganalisis PDF...</p>
+            <p className={styles.loadingText}>
+              {progress || 'Mengekstrak & menganalisis PDF...'}
+            </p>
             <p className={styles.loadingSubtext}>Proses ini mungkin memakan beberapa menit</p>
           </div>
         ) : (

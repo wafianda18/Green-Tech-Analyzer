@@ -1,14 +1,18 @@
 import { INDUSTRIES, REGIONS } from '../data/codebook.js';
 import styles from './MetadataForm.module.css';
 
-export default function MetadataForm({ metadata, onChange }) {
+export default function MetadataForm({ metadata, onChange, isProfiling }) {
   const handle = (field) => (e) => onChange({ ...metadata, [field]: e.target.value });
   const handleCheck = (field) => (e) => onChange({ ...metadata, [field]: e.target.checked });
 
   return (
     <div className={styles.form}>
       <h3 className={styles.formTitle}>Informasi Laporan</h3>
-      <p className={styles.formDesc}>Lengkapi data perusahaan sebelum menganalisis. Beberapa field dapat terisi otomatis dari nama file.</p>
+      <p className={styles.formDesc}>
+        {isProfiling
+          ? 'Mengisi otomatis dari sampul laporan… field tetap dapat diubah.'
+          : 'Lengkapi data perusahaan sebelum menganalisis. Beberapa field dapat terisi otomatis dari nama file dan isi laporan.'}
+      </p>
 
       <div className={styles.grid}>
         <div className={styles.field}>
@@ -31,7 +35,7 @@ export default function MetadataForm({ metadata, onChange }) {
             value={metadata.companyCode}
             onChange={handle('companyCode')}
           />
-          <span className={styles.hint}>Contoh: 2802-T dari "2802-T_2022_SDB.pdf"</span>
+          <span className={styles.hint}>Contoh: 2802-T dari &quot;2802-T_2022_SDB.pdf&quot;</span>
         </div>
 
         <div className={styles.field}>
@@ -91,7 +95,7 @@ export default function MetadataForm({ metadata, onChange }) {
               checked={!!metadata.useAI}
               onChange={handleCheck('useAI')}
             />
-            <span>Gunakan AI (Qwen3.5) untuk ringkasan insight</span>
+            <span>Gunakan AI untuk ringkasan insight</span>
           </label>
           <span className={styles.hint}>Membuat ringkasan otomatis berdasarkan hasil coding. Kunci API dibutuhkan di server.</span>
         </div>

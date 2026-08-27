@@ -1,12 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import UploadZone from "./components/UploadZone.jsx";
 import MetadataForm from "./components/MetadataForm.jsx";
 import ResultsPanel from "./components/ResultsPanel.jsx";
 import {
-  extractTextFromPDF,
+  extractPages,
   extractParagraphs,
   extractMetadataFromFilename,
-  extractFirstPages,
 } from "./utils/pdfExtractor.js";
 import {
   analyzeParagraphs,
@@ -17,7 +16,12 @@ import {
   generateAISummary,
   generateCompanyProfileFromText,
 } from "./utils/llm.js";
-import { REGIONS, INDUSTRIES } from "./data/codebook.js";
+import {
+  REGIONS,
+  INDUSTRIES,
+  ALL_CODES,
+  ADDITIONAL_CODES,
+} from "./data/codebook.js";
 import styles from "./App.module.css";
 
 const DEFAULT_METADATA = {
@@ -31,88 +35,143 @@ const DEFAULT_METADATA = {
   useAI: false,
 };
 
+const STEPS = ["upload", "configure", "results"];
+
+// Derived from the codebook so the claim on screen cannot drift from the data.
+// (The hard-coded "14 kode" was already out of date by three codes.)
+const CODEBOOK_CODE_COUNT = ALL_CODES.length - ADDITIONAL_CODES.length;
+
+const REQUIRED_FIELDS = [
+  ["companyName", "Nama perusahaan"],
+  ["country", "Negara"],
+  ["region", "Wilayah"],
+  ["industry", "Jenis industri"],
+];
+
 export default function App() {
   const [file, setFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isProfiling, setIsProfiling] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState(null);
   const [metadata, setMetadata] = useState(DEFAULT_METADATA);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [step, setStep] = useState("upload"); // 'upload' | 'configure' | 'results'
 
-  const handleFileSelected = useCallback(async (selectedFile) => {
-    setFile(selectedFile);
-    setError(null);
-    setAnalysisResult(null);
+  // The extracted pages are reused by the analysis run, so the PDF is parsed
+  // once per upload instead of once here and again on "Mulai Analisis".
+  const pagesRef = useRef(null);
 
-    // Auto-extract from filename
-    const { code } = extractMetadataFromFilename(selectedFile.name);
-    setMetadata((prev) => ({
-      ...prev,
-      companyCode: code || prev.companyCode,
-    }));
+  const missingFields = REQUIRED_FIELDS.filter(
+    ([field]) => !String(metadata[field] || "").trim(),
+  ).map(([, label]) => label);
 
-    // Attempt AI-based company profile extraction from first pages
+  /** Best-effort AI autofill; never blocks the user from continuing. */
+  const enrichProfileWithAI = useCallback(async (pages) => {
+    setIsProfiling(true);
     try {
-      const firstPages = await extractFirstPages(selectedFile, 3);
-      const rawText = firstPages
+      const rawText = pages
+        .slice(0, 3)
         .map((p) => p.text)
-        .join(" ")
+        .join("\n")
         .slice(0, 8000);
       const aiProfile = await generateCompanyProfileFromText(rawText, {
         regions: REGIONS,
         industries: INDUSTRIES,
       });
-      if (aiProfile) {
-        setMetadata((prev) => ({
-          ...prev,
-          companyName:
-            prev.companyName || aiProfile.companyName || prev.companyName,
-          country: prev.country || aiProfile.country || prev.country,
-          region:
-            prev.region ||
-            (REGIONS.includes(aiProfile.region)
-              ? aiProfile.region
-              : prev.region),
-          industry:
-            prev.industry ||
-            (INDUSTRIES.includes(aiProfile.industry)
-              ? aiProfile.industry
-              : prev.industry),
-          reportName:
-            prev.reportName || aiProfile.reportName || prev.reportName,
-          reportYear:
-            prev.reportYear || aiProfile.reportYear || prev.reportYear,
-        }));
-      }
-    } catch (e) {
-      console.warn("Profil AI gagal diekstrak:", e?.message || e);
-    }
+      if (!aiProfile) return;
 
-    setStep("configure");
+      setMetadata((prev) => ({
+        ...prev,
+        companyName: prev.companyName || aiProfile.companyName || "",
+        country: prev.country || aiProfile.country || "",
+        region:
+          prev.region ||
+          (REGIONS.includes(aiProfile.region) ? aiProfile.region : ""),
+        industry:
+          prev.industry ||
+          (INDUSTRIES.includes(aiProfile.industry) ? aiProfile.industry : ""),
+        reportName: prev.reportName || aiProfile.reportName || "",
+        reportYear: prev.reportYear || aiProfile.reportYear || "",
+      }));
+    } catch (e) {
+      // The AI autofill is optional: the form stays editable either way.
+      console.warn("Profil AI gagal diekstrak:", e?.message || e);
+    } finally {
+      setIsProfiling(false);
+    }
   }, []);
 
+  const handleFileSelected = useCallback(
+    async (selectedFile) => {
+      setFile(selectedFile);
+      setError(null);
+      setAnalysisResult(null);
+      pagesRef.current = null;
+
+      const { code, year } = extractMetadataFromFilename(selectedFile.name);
+      setMetadata((prev) => ({
+        ...prev,
+        companyCode: code || prev.companyCode,
+        reportYear: prev.reportYear || year,
+      }));
+
+      setIsLoading(true);
+      setProgress("Mengekstrak teks dari PDF...");
+
+      try {
+        const pages = await extractPages(selectedFile, {
+          onProgress: (pageNum, total) =>
+            setProgress(`Mengekstrak teks dari PDF... (halaman ${pageNum}/${total})`),
+        });
+        pagesRef.current = pages;
+
+        setMetadata((prev) => ({
+          ...prev,
+          reportYear: prev.reportYear || detectYear(pages),
+          reportName: prev.reportName || detectReportName(pages),
+        }));
+        setStep("configure");
+
+        // Runs in the background so step 2 is usable immediately.
+        enrichProfileWithAI(pages);
+      } catch (err) {
+        console.error(err);
+        setFile(null);
+        setError(
+          `Gagal membaca PDF: ${err.message}. Pastikan file adalah PDF teks yang valid (bukan hasil scan gambar).`,
+        );
+      } finally {
+        setIsLoading(false);
+        setProgress("");
+      }
+    },
+    [enrichProfileWithAI],
+  );
+
   const handleAnalyze = useCallback(async () => {
-    if (!file) return;
+    if (!file || missingFields.length > 0) return;
     setIsLoading(true);
     setError(null);
 
     try {
-      setProgress("Mengekstrak teks dari PDF...");
-      const pages = await extractTextFromPDF(file);
+      let pages = pagesRef.current;
+      if (!pages) {
+        setProgress("Mengekstrak teks dari PDF...");
+        pages = await extractPages(file, {
+          onProgress: (pageNum, total) =>
+            setProgress(`Mengekstrak teks dari PDF... (halaman ${pageNum}/${total})`),
+        });
+        pagesRef.current = pages;
+      }
 
       setProgress("Memisahkan paragraf...");
       const paragraphs = extractParagraphs(pages);
-
-      // Auto-detect year and report name if not set
-      const autoYear = detectYear(pages);
-      const autoReportName = detectReportName(pages);
-
-      setMetadata((prev) => ({
-        ...prev,
-        reportYear: prev.reportYear || autoYear,
-        reportName: prev.reportName || autoReportName.substring(0, 80),
-      }));
+      if (paragraphs.length === 0) {
+        throw new Error(
+          "Tidak ada paragraf yang dapat dianalisis dari dokumen ini",
+        );
+      }
 
       setProgress(
         `Menganalisis ${paragraphs.length} paragraf dengan codebook...`,
@@ -123,15 +182,13 @@ export default function App() {
       const result = analyzeParagraphs(paragraphs);
 
       if (metadata.useAI) {
-        setProgress("Menghasilkan ringkasan AI (Qwen3.5)...");
+        setProgress("Menghasilkan ringkasan AI...");
         try {
-          const aiText = await generateAISummary(result, {
-            ...metadata,
-            reportYear: autoYear || metadata.reportYear,
-          });
-          result.aiSummary = aiText;
+          result.aiSummary = await generateAISummary(result, metadata);
         } catch (e) {
           console.warn("Gagal mendapatkan ringkasan AI:", e?.message || e);
+          result.aiSummaryError =
+            "Ringkasan AI tidak tersedia (periksa konfigurasi API di server).";
         }
       }
 
@@ -146,15 +203,23 @@ export default function App() {
       setIsLoading(false);
       setProgress("");
     }
-  }, [file]);
+  }, [file, metadata, missingFields.length]);
 
   const handleReset = () => {
     setFile(null);
     setAnalysisResult(null);
     setError(null);
+    setProgress("");
     setMetadata(DEFAULT_METADATA);
+    pagesRef.current = null;
     setStep("upload");
   };
+
+  const errorBox = error ? (
+    <div className={styles.errorBox} role="alert">
+      <strong>Error:</strong> {error}
+    </div>
+  ) : null;
 
   return (
     <div className={styles.app}>
@@ -210,27 +275,27 @@ export default function App() {
             { key: "upload", label: "1. Upload PDF" },
             { key: "configure", label: "2. Konfigurasi" },
             { key: "results", label: "3. Hasil Analisis" },
-          ].map((s, i) => (
-            <div key={s.key} className={styles.stepItem}>
-              <span
-                className={`${styles.stepDot} ${
-                  s.key === step
-                    ? styles.stepActive
-                    : ["upload", "configure", "results"].indexOf(s.key) <
-                        ["upload", "configure", "results"].indexOf(step)
-                      ? styles.stepDone
-                      : ""
-                }`}
-              >
-                {["upload", "configure", "results"].indexOf(s.key) <
-                ["upload", "configure", "results"].indexOf(step)
-                  ? "✓"
-                  : i + 1}
-              </span>
-              <span className={styles.stepLabel}>{s.label}</span>
-              {i < 2 && <div className={styles.stepLine} />}
-            </div>
-          ))}
+          ].map((s, i) => {
+            const isDone = STEPS.indexOf(s.key) < STEPS.indexOf(step);
+            const isActive = s.key === step;
+            return (
+              <div key={s.key} className={styles.stepItem}>
+                <span
+                  className={`${styles.stepDot} ${
+                    isActive
+                      ? styles.stepActive
+                      : isDone
+                        ? styles.stepDone
+                        : ""
+                  }`}
+                >
+                  {isDone ? "✓" : i + 1}
+                </span>
+                <span className={styles.stepLabel}>{s.label}</span>
+                {i < 2 && <div className={styles.stepLine} />}
+              </div>
+            );
+          })}
         </div>
 
         {/* Main content */}
@@ -254,7 +319,7 @@ export default function App() {
                 </p>
                 <div className={styles.featureList}>
                   {[
-                    "14 kode sesuai codebook + 2 kode tambahan",
+                    `${CODEBOOK_CODE_COUNT} kode sesuai codebook + ${ADDITIONAL_CODES.length} kode tambahan`,
                     "Deteksi negative case & intent-only",
                     "Export CSV & laporan teks",
                     "Desain berdasarkan decision rules",
@@ -265,9 +330,14 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {errorBox}
+
               <UploadZone
                 onFileSelected={handleFileSelected}
+                onInvalidFile={(message) => setError(message)}
                 isLoading={isLoading}
+                progress={progress}
               />
             </div>
           )}
@@ -295,18 +365,22 @@ export default function App() {
                 <div>
                   <p className={styles.fileName}>{file?.name}</p>
                   <p className={styles.fileSize}>
-                    {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ""}
+                    {file
+                      ? `${(file.size / 1024 / 1024).toFixed(2)} MB · ${
+                          pagesRef.current?.length ?? 0
+                        } halaman`
+                      : ""}
                   </p>
                 </div>
               </div>
 
-              <MetadataForm metadata={metadata} onChange={setMetadata} />
+              <MetadataForm
+                metadata={metadata}
+                onChange={setMetadata}
+                isProfiling={isProfiling}
+              />
 
-              {error && (
-                <div className={styles.errorBox}>
-                  <strong>Error:</strong> {error}
-                </div>
-              )}
+              {errorBox}
 
               <div className={styles.analyzeActions}>
                 {isLoading && (
@@ -320,13 +394,13 @@ export default function App() {
                 <button
                   className={styles.analyzeBtn}
                   onClick={handleAnalyze}
-                  disabled={isLoading || !metadata.companyName}
+                  disabled={isLoading || missingFields.length > 0}
                 >
                   {isLoading ? "Menganalisis..." : "Mulai Analisis →"}
                 </button>
-                {!metadata.companyName && (
+                {missingFields.length > 0 && (
                   <p className={styles.requiredNote}>
-                    * Nama perusahaan wajib diisi
+                    * Wajib diisi: {missingFields.join(", ")}
                   </p>
                 )}
               </div>
